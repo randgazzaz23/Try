@@ -55,7 +55,7 @@
 			  
 		// Load Accidents and Community file:
 		Promise.all([
-		d3.json("Community.json"),
+		d3.json("Community.geojson"),
 		d3.csv ("https://raw.githubusercontent.com/sheriefAbdallah/CS318/refs/heads/main/Traffic_Incidents.csv") ]).then (([geo, accidents]) =>{
 		
 		// Convert accidents to geojson points
