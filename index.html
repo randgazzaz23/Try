@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset = "UTF-8">
+	<title>Duabi Accidents CHoropleth</title>
+	
+	<!--load d3-->
+	<script src = "https://d3js.org/d3.v7.min.js"></script>
+	
+	<!-- load Truf.js to find accidents for each polygon-->
+	<script src = "https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+	
+	<style>
+	
+	body{
+	font-family: Arial, sans-serif;
+	}
+	#tooltip{
+		position:absolute;
+		background:white;
+		padding: 6px;
+		border:1px solid #aaa;
+		border-radius:4px;
+		display:none;
+		pointer-events:none;
+		}
+		
+	</style>
+	
+</head>
+
+<body>
+	<h2>Dubai Accident Choropleth</h2>
+	<div id = "tooltip"></div>
+	
+	<script>
+		const width = 1000;
+		const height = 800;
+		
+		const svg = d3.select("body")
+			.append("svg")
+			.attr("width" , width)
+			.attr("height" , height);
+			
+		const tooltip = d3.select("#tooltip");
+		
+		
+		//Extract Community name:
+		function getCommunityName(f){
+			return(f.properties.CNAME_E || f.properties.COMMUNITY_E ||
+              f.properties.LABEL_E ||
+              f.properties.name ||
+              "").trim();
+			}  
+			  
+		// Load Accidents and Community file:
+		Promise.all([
+		d3.json("Community.json"),
+		d3.csv ("https://raw.githubusercontent.com/sheriefAbdallah/CS318/refs/heads/main/Traffic_Incidents.csv") ]).then (([geo, accidents]) =>{
+		
+		// Convert accidents to geojson points
+		const accidentPoints = accidents.map (d => ({
+			type:"Feature",
+			properties :d,
+			geometry: {
+				type:"Point",
+				coordinates: [+d.acci_x, +d.acci_y]
+				}
+				}));
+				
+		
+		// accident counter per Community
+		const accidentCounter ={};
+		
+		geo.features.forEach(f => {
+			const name = getCommunityName(f);
+			accidentCounter[name] =0;
+			});
+			
+		//Spatial joint: point-in polygon
+		accidentPoints.forEach(p => {
+			geo.features.forEach( poly => {
+				if (turf.booleanPointInPolygon(p, poly)){
+				const name = getCommunityName(poly);
+				accidentCounter[name]++;
+				}
+			});
+		});
+		
+		
+		console.log("Accidents per community:", accidentCounter);
+		
+		 // Create color scale
+      const values = Object.values(accidentCounter);
+      const color = d3.scaleSequential()
+        .domain([d3.min(values), d3.max(values)])
+        .interpolator(d3.interpolateReds);
+
+		// project and draw map
+		const projection  = d3.geoMercator()
+		.fitSize([width, height], geo);
+		
+		const path = d3.geoPath().projection(projection);
+		
+		svg.selectAll("path")
+			.data(geo.features)
+			.join("path")
+			.attr("d", path)
+			.attr("fill" ,d => { 
+			const name = getCommunityName(d);
+			return color (accidentCounter[name] || 0);
+			})
+			.attr("stroke" ,"#333")
+			.attr("stroke-width", 0.5)
+			.on ("mousemove", (event, d)=> {
+			const name = getCommunityName(d);
+			tooltip
+				.style("display", "block")
+				.style("left", (event.pageX + 10) +"px")
+				.style("top", (event.pageY +10) +"px")
+				.html(`<b>${name}</b><br>Accidents: ${accidentCount[name]}`);
+        })
+        .on("mouseout", () => tooltip.style("display", "none"));
+
+    });
+  </script>
+</body>
+</html>
+		
